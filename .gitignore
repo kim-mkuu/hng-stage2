@@ -1,6 +1,7 @@
 
 henv2/
 __pycache__/
+staticfiles/
 *.pyc
 *.pyo
 *.pyd
