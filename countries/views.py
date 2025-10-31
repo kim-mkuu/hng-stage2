@@ -17,58 +17,59 @@ import os
 def refresh_countries(request):
     """Fetch and cache country data from external APIs"""
     try:
-        # Fetch data from external APIs
-        countries_data = fetch_countries()
+        # Fetch exchange rates once
         exchange_rates = fetch_exchange_rates()
         
-        # Process each country
-        for country_data in countries_data:
-            try:
-                name = country_data.get('name')
-                population = country_data.get('population')
-                
-                # Skip if required fields are missing
-                if not name or population is None:
-                    continue
-                
-                capital = country_data.get('capital')
-                region = country_data.get('region')
-                flag_url = country_data.get('flag')
-                currencies = country_data.get('currencies', [])
-                
-                # Handle currency
-                currency_code = None
-                exchange_rate = None
-                estimated_gdp = None
-                
-                if currencies and len(currencies) > 0:
-                    currency_code = currencies[0].get('code')
+        # Fetch countries data
+        countries_data = fetch_countries()
+        
+        # Process in smaller batches to reduce memory
+        batch_size = 50
+        for i in range(0, len(countries_data), batch_size):
+            batch = countries_data[i:i+batch_size]
+            
+            for country_data in batch:
+                try:
+                    name = country_data.get('name')
+                    population = country_data.get('population')
                     
-                    if currency_code and currency_code in exchange_rates:
-                        exchange_rate = exchange_rates[currency_code]
-                        estimated_gdp = calculate_estimated_gdp(population, exchange_rate)
-                
-                # Set estimated_gdp to 0 if no currency
-                if not currency_code:
-                    estimated_gdp = 0
-                
-                # Update or create country
-                Country.objects.update_or_create(
-                    name__iexact=name,
-                    defaults={
-                        'name': name,
-                        'capital': capital,
-                        'region': region,
-                        'population': population,
-                        'currency_code': currency_code,
-                        'exchange_rate': exchange_rate,
-                        'estimated_gdp': estimated_gdp,
-                        'flag_url': flag_url,
-                    }
-                )
-            except Exception as e:
-                # Continue processing other countries if one fails
-                continue
+                    if not name or population is None:
+                        continue
+                    
+                    capital = country_data.get('capital')
+                    region = country_data.get('region')
+                    flag_url = country_data.get('flag')
+                    currencies = country_data.get('currencies', [])
+                    
+                    currency_code = None
+                    exchange_rate = None
+                    estimated_gdp = None
+                    
+                    if currencies and len(currencies) > 0:
+                        currency_code = currencies[0].get('code')
+                        
+                        if currency_code and currency_code in exchange_rates:
+                            exchange_rate = exchange_rates[currency_code]
+                            estimated_gdp = calculate_estimated_gdp(population, exchange_rate)
+                    
+                    if not currency_code:
+                        estimated_gdp = 0
+                    
+                    Country.objects.update_or_create(
+                        name__iexact=name,
+                        defaults={
+                            'name': name,
+                            'capital': capital,
+                            'region': region,
+                            'population': population,
+                            'currency_code': currency_code,
+                            'exchange_rate': exchange_rate,
+                            'estimated_gdp': estimated_gdp,
+                            'flag_url': flag_url,
+                        }
+                    )
+                except Exception:
+                    continue
         
         # Generate summary image
         total_countries = Country.objects.count()
